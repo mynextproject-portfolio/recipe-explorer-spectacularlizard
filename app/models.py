@@ -15,7 +15,7 @@ class DifficultyLevel(str, Enum):
 
 class Recipe(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    title: str 
+    title: str
     description: str
     ingredients: List[str]
     instructions: str
@@ -24,11 +24,7 @@ class Recipe(BaseModel):
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
 
-
-    class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
+    # Pydantic v2 serializes datetime to ISO format by default
 
 
 class RecipeCreate(BaseModel):
