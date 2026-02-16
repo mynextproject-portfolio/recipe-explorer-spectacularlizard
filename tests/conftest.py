@@ -1,27 +1,14 @@
 """
 Test fixtures for Recipe Explorer tests.
 """
-from unittest.mock import patch, MagicMock
-
 import pytest
 from fastapi.testclient import TestClient
-
 from app.main import app
 from app.services.storage import recipe_storage
 
 
 @pytest.fixture
-def mock_themealdb():
-    """Mock TheMealDB adapter to avoid real API calls. Returns empty by default."""
-    mock = MagicMock()
-    mock.search_meals.return_value = []
-    mock.get_meal_by_id.return_value = None
-    with patch("app.routes.api.themealdb_adapter", mock):
-        yield mock
-
-
-@pytest.fixture
-def client(mock_themealdb):
+def client():
     """Test client for making requests to the API"""
     return TestClient(app)
 

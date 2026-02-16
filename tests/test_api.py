@@ -22,15 +22,12 @@ def test_home_page_loads(client):
 
 
 def test_get_all_recipes(client, clean_storage):
-    """Contract test: GET /api/recipes returns correct structure with source field"""
+    """Contract test: GET /api/recipes returns correct structure"""
     response = client.get("/api/recipes")
     assert response.status_code == 200
     data = response.json()
     assert "recipes" in data
     assert isinstance(data["recipes"], list)
-    for r in data["recipes"]:
-        assert "source" in r
-        assert r["source"] in ("internal", "external")
 
 
 def test_create_and_get_recipe(client, clean_storage, sample_recipe_data):
@@ -80,7 +77,7 @@ def test_recipe_pages_load(client, clean_storage, sample_recipe_data):
 
 
 def test_get_recipes_with_search(client, clean_storage, sample_recipe_data):
-    """Contract test: GET /api/recipes?search= returns filtered list with source field"""
+    """Contract test: GET /api/recipes?search= returns filtered list"""
     client.post("/api/recipes", json=sample_recipe_data)
     response = client.get("/api/recipes", params={"search": "Test"})
     assert response.status_code == 200
@@ -88,7 +85,6 @@ def test_get_recipes_with_search(client, clean_storage, sample_recipe_data):
     assert "recipes" in data
     assert len(data["recipes"]) >= 1
     assert all("Test" in r["title"] for r in data["recipes"])
-    assert all(r["source"] in ("internal", "external") for r in data["recipes"])
 
 
 # --- GET /api/recipes/export ---
@@ -261,100 +257,3 @@ def test_import_recipes_422_schema_validation(client, clean_storage):
     detail = data["detail"]
     assert "errors" in detail
     assert len(detail["errors"]) > 0
-
-
-# --- TheMealDB integration ---
-
-
-def test_search_returns_combined_internal_and_external(
-    client, clean_storage, sample_recipe_data, mock_themealdb
-):
-    """Search returns results from both internal and external sources"""
-    mock_themealdb.search_meals.return_value = [
-        {
-            "id": "external-52772",
-            "title": "External Chicken Casserole",
-            "description": "A casserole",
-            "ingredients": ["chicken", "rice"],
-            "instructions": ["Cook it"],
-            "tags": ["Chicken"],
-            "cuisine": "Japanese",
-            "source": "external",
-            "image_url": "https://example.com/image.jpg",
-            "external_id": "52772",
-        }
-    ]
-    client.post("/api/recipes", json=sample_recipe_data)
-    response = client.get("/api/recipes", params={"search": "Test"})
-    assert response.status_code == 200
-    recipes = response.json()["recipes"]
-    internal = [r for r in recipes if r["source"] == "internal"]
-    external = [r for r in recipes if r["source"] == "external"]
-    assert len(internal) >= 1
-    assert len(external) >= 1
-    assert external[0]["id"] == "external-52772"
-    assert external[0]["title"] == "External Chicken Casserole"
-
-
-def test_get_recipe_internal(client, clean_storage, sample_recipe_data):
-    """GET /api/recipes/internal/{id} returns internal recipe with source"""
-    create_resp = client.post("/api/recipes", json=sample_recipe_data)
-    recipe_id = create_resp.json()["id"]
-    response = client.get(f"/api/recipes/internal/{recipe_id}")
-    assert response.status_code == 200
-    data = response.json()
-    assert data["id"] == recipe_id
-    assert data["source"] == "internal"
-
-
-def test_get_recipe_internal_not_found(client, clean_storage):
-    """GET /api/recipes/internal/{id} returns 404 for missing recipe"""
-    response = client.get("/api/recipes/internal/non-existent")
-    assert response.status_code == 404
-
-
-def test_get_recipe_external(client, mock_themealdb):
-    """GET /api/recipes/external/{id} returns external recipe with source"""
-    mock_themealdb.get_meal_by_id.return_value = {
-        "id": "external-52772",
-        "title": "Teriyaki Chicken",
-        "description": "Yummy chicken",
-        "ingredients": ["chicken"],
-        "instructions": ["Cook"],
-        "tags": ["Chicken"],
-        "cuisine": "Japanese",
-        "source": "external",
-        "image_url": "https://example.com/img.jpg",
-        "external_id": "52772",
-    }
-    response = client.get("/api/recipes/external/52772")
-    assert response.status_code == 200
-    data = response.json()
-    assert data["id"] == "external-52772"
-    assert data["source"] == "external"
-
-
-def test_get_recipe_external_not_found(client, mock_themealdb):
-    """GET /api/recipes/external/{id} returns 404 for missing external recipe"""
-    mock_themealdb.get_meal_by_id.return_value = None
-    response = client.get("/api/recipes/external/999999")
-    assert response.status_code == 404
-
-
-def test_get_recipe_by_id_resolves_external(client, mock_themealdb):
-    """GET /api/recipes/{id} resolves external-{id} format"""
-    mock_themealdb.get_meal_by_id.return_value = {
-        "id": "external-52772",
-        "title": "Teriyaki Chicken",
-        "description": "Yummy",
-        "ingredients": ["chicken"],
-        "instructions": ["Cook"],
-        "tags": [],
-        "cuisine": "Japanese",
-        "source": "external",
-        "image_url": None,
-        "external_id": "52772",
-    }
-    response = client.get("/api/recipes/external-52772")
-    assert response.status_code == 200
-    assert response.json()["source"] == "external"

@@ -1,53 +1,22 @@
-from fastapi import APIRouter, Request, Form, HTTPException
+from fastapi import APIRouter, Request, Form, HTTPException, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from typing import Any, List, Optional
-
+from typing import List, Optional
 from app.models import RecipeCreate, RecipeUpdate
 from app.services.storage import recipe_storage
-from app.adapters.themealdb import themealdb_adapter
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
 
-def _get_combined_recipes(search: Optional[str] = None) -> List[dict[str, Any]]:
-    """Get recipes from internal and external sources, with source field."""
-    if search:
-        internal = recipe_storage.search_recipes(search)
-        external = themealdb_adapter.search_meals(search)
-    else:
-        internal = recipe_storage.get_all_recipes()
-        external = []
-
-    result = []
-    for r in internal:
-        data = r.model_dump(mode="json")
-        data["source"] = "internal"
-        result.append(data)
-    result.extend(external)
-    return result
-
-
-def _get_recipe_for_detail(recipe_id: str) -> Optional[dict[str, Any]]:
-    """Get recipe by ID from internal or external source."""
-    # Try internal first
-    recipe = recipe_storage.get_recipe(recipe_id)
-    if recipe:
-        data = recipe.model_dump(mode="json")
-        data["source"] = "internal"
-        return data
-
-    # Try external
-    external_id = recipe_id.replace("external-", "", 1) if recipe_id.startswith("external-") else recipe_id
-    return themealdb_adapter.get_meal_by_id(external_id)
-
-
 @router.get("/", response_class=HTMLResponse)
 def home(request: Request, search: Optional[str] = None, message: Optional[str] = None):
-    """Home page with recipe list and search (combined internal + external)"""
-    recipes = _get_combined_recipes(search)
-
+    """Home page with recipe list and search"""
+    if search:
+        recipes = recipe_storage.search_recipes(search)
+    else:
+        recipes = recipe_storage.get_all_recipes()
+    
     return templates.TemplateResponse(request, "index.html", {
         "recipes": recipes,
         "search_query": search or "",
@@ -66,12 +35,11 @@ def new_recipe_form(request: Request):
 
 @router.get("/recipes/{recipe_id}", response_class=HTMLResponse)
 def recipe_detail(request: Request, recipe_id: str, message: Optional[str] = None):
-    """Recipe detail page (internal or external)"""
-    recipe = _get_recipe_for_detail(recipe_id)
+    """Recipe detail page"""
+    recipe = recipe_storage.get_recipe(recipe_id)
     if not recipe:
         raise HTTPException(status_code=404, detail="Recipe not found")
-
-    # Pass as dict so template can check source and show/hide Edit/Delete
+    
     return templates.TemplateResponse(request, "recipe_detail.html", {
         "recipe": recipe,
         "message": message

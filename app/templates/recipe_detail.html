@@ -60,7 +60,6 @@
     </div>
     
     <div class="col-md-4">
-        {% if recipe.get('source') == 'internal' %}
         <div class="card">
             <div class="card-body">
                 <h5 class="card-title">Recipe Actions</h5>
@@ -77,32 +76,16 @@
                 </div>
             </div>
         </div>
-        {% else %}
-        <div class="card">
-            <div class="card-body">
-                <span class="badge bg-secondary">External Recipe (TheMealDB)</span>
-                <p class="mt-2 small text-muted">This recipe is read-only.</p>
-            </div>
-        </div>
-        {% endif %}
-
-        {% if recipe.get('image_url') %}
-        <div class="card mt-3">
-            <img src="{{ recipe.image_url }}" class="card-img-top" alt="{{ recipe.title }}">
-        </div>
-        {% endif %}
-
+        
         <div class="card mt-3">
             <div class="card-body">
                 <h6 class="card-title">Recipe Info</h6>
                 <small class="text-muted">
-                    {% if recipe.get('created_at') %}
-                    <div><strong>Created:</strong> {{ recipe.created_at[:10] }}</div>
-                    <div><strong>Updated:</strong> {{ recipe.updated_at[:10] }}</div>
-                    {% endif %}
+                    <div><strong>Created:</strong> {{ recipe.created_at.strftime('%B %d, %Y') }}</div>
+                    <div><strong>Updated:</strong> {{ recipe.updated_at.strftime('%B %d, %Y') }}</div>
                     <div><strong>Ingredients:</strong> {{ recipe.ingredients|length }}</div>
                     <div><strong>Steps:</strong> {{ recipe.instructions|length }}</div>
-                    {% if recipe.get('cuisine') %}<div><strong>Cuisine:</strong> {{ recipe.cuisine }}</div>{% endif %}
+                    {% if recipe.cuisine %}<div><strong>Cuisine:</strong> {{ recipe.cuisine }}</div>{% endif %}
                 </small>
             </div>
         </div>
