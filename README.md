@@ -42,6 +42,17 @@ pytest           # Run all tests
 pytest -v        # Verbose output
 ```
 
+## Schema Validation
+
+Validate recipe JSON files against the schema before importing:
+
+```bash
+python scripts/validate_recipes.py sample-recipes.json
+python scripts/validate_recipes.py path/to/recipes.json
+```
+
+Exit code 0 = valid, 1 = validation failed.
+
 ## API Endpoints
 
 **Pages:**
