@@ -358,3 +358,53 @@ def test_get_recipe_by_id_resolves_external(client, mock_themealdb):
     response = client.get("/api/recipes/external-52772")
     assert response.status_code == 200
     assert response.json()["source"] == "external"
+
+
+# --- Metrics ---
+
+
+def test_recipes_response_includes_metrics(client, clean_storage):
+    """GET /api/recipes returns _metrics with internal_ms and external_ms"""
+    response = client.get("/api/recipes")
+    assert response.status_code == 200
+    data = response.json()
+    assert "_metrics" in data
+    m = data["_metrics"]
+    assert "internal_ms" in m
+    assert "external_ms" in m
+    assert isinstance(m["internal_ms"], (int, float))
+    assert isinstance(m["external_ms"], (int, float))
+
+
+def test_search_response_includes_metrics(client, clean_storage, sample_recipe_data, mock_themealdb):
+    """GET /api/recipes?search= returns metrics showing both internal and external timing"""
+    mock_themealdb.search_meals.return_value = [
+        {"id": "external-1", "title": "External", "source": "external"}
+    ]
+    client.post("/api/recipes", json=sample_recipe_data)
+    response = client.get("/api/recipes", params={"search": "Test"})
+    assert response.status_code == 200
+    data = response.json()
+    assert "_metrics" in data
+    # Internal query ran (search)
+    assert data["_metrics"]["internal_ms"] >= 0
+    # External API call ran
+    assert data["_metrics"]["external_ms"] >= 0
+
+
+def test_metrics_endpoint_returns_aggregate(client, clean_storage, sample_recipe_data, mock_themealdb):
+    """GET /api/metrics returns aggregate internal/external stats"""
+    mock_themealdb.search_meals.return_value = []
+    mock_themealdb.get_meal_by_id.return_value = None
+    client.post("/api/recipes", json=sample_recipe_data)
+    client.get("/api/recipes")
+    client.get("/api/recipes", params={"search": "Test"})
+    response = client.get("/api/metrics")
+    assert response.status_code == 200
+    data = response.json()
+    assert "internal" in data
+    assert "external" in data
+    assert "count" in data["internal"]
+    assert "total_ms" in data["internal"]
+    assert "avg_ms" in data["internal"]
+    assert data["internal"]["count"] >= 2  # at least 2 internal queries

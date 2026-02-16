@@ -7,6 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.services.metrics import aggregate_metrics
 from app.services.storage import recipe_storage
 
 
@@ -32,6 +33,16 @@ def clean_storage():
     recipe_storage.recipes.clear()
     yield
     recipe_storage.recipes.clear()
+
+
+@pytest.fixture(autouse=True)
+def reset_aggregate_metrics():
+    """Reset aggregate metrics before each test for consistent assertions."""
+    aggregate_metrics.internal_count = 0
+    aggregate_metrics.external_count = 0
+    aggregate_metrics.internal_total_ms = 0.0
+    aggregate_metrics.external_total_ms = 0.0
+    yield
 
 
 @pytest.fixture

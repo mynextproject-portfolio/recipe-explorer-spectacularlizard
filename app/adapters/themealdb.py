@@ -3,7 +3,8 @@ TheMealDB API adapter with proper error handling and data transformation.
 Transforms external API format to match internal Recipe schema.
 """
 import re
-from typing import Any, List, Optional
+import time
+from typing import Any, Callable, List, Optional
 import logging
 
 import httpx
@@ -90,9 +91,23 @@ def transform_meal_to_recipe(meal: dict[str, Any]) -> dict[str, Any]:
 class TheMealDBAdapter:
     """Adapter for TheMealDB API with error handling."""
 
-    def __init__(self, base_url: str = BASE_URL, timeout: float = DEFAULT_TIMEOUT):
+    def __init__(
+        self,
+        base_url: str = BASE_URL,
+        timeout: float = DEFAULT_TIMEOUT,
+        on_request_done: Optional[Callable[[float], None]] = None,
+    ):
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
+        self._on_request_done = on_request_done
+
+    def _record_timing(self, elapsed_ms: float) -> None:
+        """Call timing callback if configured."""
+        if self._on_request_done is not None:
+            try:
+                self._on_request_done(elapsed_ms)
+            except Exception as e:
+                logger.debug("Timing callback error: %s", e)
 
     def search_meals(self, query: str) -> List[dict[str, Any]]:
         """
@@ -104,6 +119,7 @@ class TheMealDBAdapter:
 
         url = f"{self.base_url}/search.php"
         params = {"s": str(query).strip()}
+        start = time.perf_counter()
 
         try:
             with httpx.Client(timeout=self.timeout) as client:
@@ -112,17 +128,22 @@ class TheMealDBAdapter:
                 data = response.json()
         except httpx.TimeoutException as e:
             logger.warning("TheMealDB search timed out: %s", e)
+            self._record_timing((time.perf_counter() - start) * 1000)
             return []
         except httpx.ConnectError as e:
             logger.warning("TheMealDB connection failed: %s", e)
+            self._record_timing((time.perf_counter() - start) * 1000)
             return []
         except httpx.HTTPStatusError as e:
             logger.warning("TheMealDB HTTP error %s: %s", e.response.status_code, e)
+            self._record_timing((time.perf_counter() - start) * 1000)
             return []
         except Exception as e:
             logger.warning("TheMealDB unexpected error: %s", e)
+            self._record_timing((time.perf_counter() - start) * 1000)
             return []
 
+        self._record_timing((time.perf_counter() - start) * 1000)
         meals = data.get("meals")
         if meals is None:
             return []
@@ -146,6 +167,7 @@ class TheMealDBAdapter:
 
         url = f"{self.base_url}/lookup.php"
         params = {"i": str(meal_id).strip()}
+        start = time.perf_counter()
 
         try:
             with httpx.Client(timeout=self.timeout) as client:
@@ -154,17 +176,22 @@ class TheMealDBAdapter:
                 data = response.json()
         except httpx.TimeoutException as e:
             logger.warning("TheMealDB lookup timed out: %s", meal_id)
+            self._record_timing((time.perf_counter() - start) * 1000)
             return None
         except httpx.ConnectError as e:
             logger.warning("TheMealDB connection failed: %s", e)
+            self._record_timing((time.perf_counter() - start) * 1000)
             return None
         except httpx.HTTPStatusError as e:
             logger.warning("TheMealDB HTTP error: %s", e)
+            self._record_timing((time.perf_counter() - start) * 1000)
             return None
         except Exception as e:
             logger.warning("TheMealDB unexpected error: %s", e)
+            self._record_timing((time.perf_counter() - start) * 1000)
             return None
 
+        self._record_timing((time.perf_counter() - start) * 1000)
         meals = data.get("meals")
         if not meals or not isinstance(meals, list):
             return None
