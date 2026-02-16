@@ -1,12 +1,20 @@
+import json
+from typing import Any, List, Optional
+
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from fastapi.responses import JSONResponse
-from typing import Any, List, Optional
-import json
 
+from app.adapters.themealdb import themealdb_adapter
 from app.models import Recipe, RecipeCreate, RecipeUpdate
+from app.services.metrics import (
+    aggregate_metrics,
+    current_metrics,
+    start_request_metrics,
+    timed_internal,
+    timed_external,
+)
 from app.services.storage import recipe_storage
 from app.validation import validate_recipes_for_import
-from app.adapters.themealdb import themealdb_adapter
 
 router = APIRouter(prefix="/api")
 
@@ -18,53 +26,75 @@ def _recipe_to_response(recipe: Recipe, source: str = "internal") -> dict[str, A
     return data
 
 
+def _build_response(data: dict, include_metrics: bool = True) -> dict:
+    """Build response dict, optionally including timing metrics."""
+    if include_metrics:
+        m = current_metrics()
+        if m is not None:
+            metrics_dict = m.to_dict()
+            aggregate_metrics.record(m.internal_ms, m.external_ms)
+            data = {**data, "_metrics": metrics_dict}
+    return data
+
+
 @router.get("/recipes")
 def get_recipes(search: Optional[str] = None):
     """Get all recipes or search by title. Combines internal and external sources when searching."""
+    start_request_metrics()
     # TODO: Add pagination when we have more than 100 recipes
     if search:
-        internal_recipes = recipe_storage.search_recipes(search)
-        external_recipes = themealdb_adapter.search_meals(search)
+        with timed_internal():
+            internal_recipes = recipe_storage.search_recipes(search)
+        with timed_external():
+            external_recipes = themealdb_adapter.search_meals(search)
         internal_with_source = [_recipe_to_response(r, "internal") for r in internal_recipes]
         combined = internal_with_source + external_recipes
     else:
-        internal_recipes = recipe_storage.get_all_recipes()
+        with timed_internal():
+            internal_recipes = recipe_storage.get_all_recipes()
         combined = [_recipe_to_response(r, "internal") for r in internal_recipes]
 
-    return {"recipes": combined}
+    return _build_response({"recipes": combined})
 
 
 @router.get("/recipes/search")
 def search_recipes(q: Optional[str] = None):
     """Search recipes by query. Accepts 'q' as query parameter. Returns combined internal + external results."""
-    # Alias for GET /api/recipes?search= - supports both 'q' and empty query
+    start_request_metrics()
     if q:
-        internal_recipes = recipe_storage.search_recipes(q)
-        external_recipes = themealdb_adapter.search_meals(q)
+        with timed_internal():
+            internal_recipes = recipe_storage.search_recipes(q)
+        with timed_external():
+            external_recipes = themealdb_adapter.search_meals(q)
         internal_with_source = [_recipe_to_response(r, "internal") for r in internal_recipes]
         combined = internal_with_source + external_recipes
     else:
-        internal_recipes = recipe_storage.get_all_recipes()
+        with timed_internal():
+            internal_recipes = recipe_storage.get_all_recipes()
         combined = [_recipe_to_response(r, "internal") for r in internal_recipes]
-    return {"recipes": combined}
+    return _build_response({"recipes": combined})
 
 
 @router.get("/recipes/internal/{recipe_id}")
 def get_recipe_internal(recipe_id: str):
     """Get a recipe by ID from internal storage."""
-    recipe = recipe_storage.get_recipe(recipe_id)
+    start_request_metrics()
+    with timed_internal():
+        recipe = recipe_storage.get_recipe(recipe_id)
     if not recipe:
         raise HTTPException(status_code=404, detail="Recipe not found")
-    return _recipe_to_response(recipe, "internal")
+    return _build_response(_recipe_to_response(recipe, "internal"))
 
 
 @router.get("/recipes/external/{recipe_id}")
 def get_recipe_external(recipe_id: str):
     """Get a recipe by ID from TheMealDB (external). Use numeric meal ID (e.g. 52772)."""
-    recipe_dict = themealdb_adapter.get_meal_by_id(recipe_id)
+    start_request_metrics()
+    with timed_external():
+        recipe_dict = themealdb_adapter.get_meal_by_id(recipe_id)
     if not recipe_dict:
         raise HTTPException(status_code=404, detail="Recipe not found")
-    return recipe_dict
+    return _build_response(recipe_dict)
 
 
 @router.get("/recipes/export")
@@ -78,18 +108,20 @@ def export_recipes():
 @router.get("/recipes/{recipe_id}")
 def get_recipe(recipe_id: str):
     """Get a recipe by ID from internal or external source."""
-    # Try internal first
-    recipe = recipe_storage.get_recipe(recipe_id)
+    start_request_metrics()
+    with timed_internal():
+        recipe = recipe_storage.get_recipe(recipe_id)
     if recipe:
-        return _recipe_to_response(recipe, "internal")
+        return _build_response(_recipe_to_response(recipe, "internal"))
 
     # Try external (numeric ID or external-{id} format)
     external_id = recipe_id
     if recipe_id.startswith("external-"):
         external_id = recipe_id.replace("external-", "", 1)
-    recipe_dict = themealdb_adapter.get_meal_by_id(external_id)
+    with timed_external():
+        recipe_dict = themealdb_adapter.get_meal_by_id(external_id)
     if recipe_dict:
-        return recipe_dict
+        return _build_response(recipe_dict)
 
     raise HTTPException(status_code=404, detail="Recipe not found")
 
@@ -175,3 +207,9 @@ async def import_recipes(file: UploadFile = File(...)):
     count = recipe_storage.import_recipes(recipes_dict)
 
     return {"message": f"Successfully imported {count} recipes", "count": count}
+
+
+@router.get("/metrics")
+def get_metrics():
+    """Return aggregate performance metrics (internal vs external query times)."""
+    return aggregate_metrics.to_dict()
