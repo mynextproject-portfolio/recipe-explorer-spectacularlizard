@@ -63,12 +63,17 @@
                         <small class="text-muted">
                             {{ recipe.ingredients|length }} ingredients •
                             {{ recipe.instructions|length }} steps
+                            {% if recipe.get('source') == 'external' %}
+                            • <span class="badge bg-secondary">External</span>
+                            {% endif %}
                         </small>
                     </div>
                 </div>
                 <div class="card-footer bg-transparent">
                     <a href="/recipes/{{ recipe.id }}" class="btn btn-primary btn-sm">View Recipe</a>
+                    {% if recipe.get('source') == 'internal' %}
                     <a href="/recipes/{{ recipe.id }}/edit" class="btn btn-outline-secondary btn-sm">Edit</a>
+                    {% endif %}
                 </div>
             </div>
         </div>
