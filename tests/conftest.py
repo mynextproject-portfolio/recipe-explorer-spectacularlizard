@@ -32,3 +32,21 @@ def sample_recipe_data():
         "tags": ["test"],
         "cuisine": "Test Cuisine"
     }
+
+
+@pytest.fixture
+def valid_import_json():
+    """Valid recipes JSON for import testing"""
+    return [
+        {
+            "id": "import-test-001",
+            "title": "Imported Recipe",
+            "description": "An imported test recipe",
+            "ingredients": ["flour", "water"],
+            "instructions": ["Mix ingredients", "Bake"],
+            "tags": ["imported"],
+            "cuisine": "Test",
+            "created_at": "2024-01-01T00:00:00",
+            "updated_at": "2024-01-01T00:00:00",
+        }
+    ]

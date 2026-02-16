@@ -2,8 +2,10 @@ from fastapi import APIRouter, HTTPException, UploadFile, File
 from fastapi.responses import JSONResponse
 from typing import List, Optional
 import json
+
 from app.models import Recipe, RecipeCreate, RecipeUpdate
 from app.services.storage import recipe_storage
+from app.validation import validate_recipes_for_import
 
 router = APIRouter(prefix="/api")
 
@@ -27,7 +29,7 @@ def get_recipes(search: Optional[str] = None):
 def export_recipes():
     """Export all recipes as JSON"""
     recipes = recipe_storage.get_all_recipes()
-    recipes_dict = [recipe.model_dump() for recipe in recipes]
+    recipes_dict = [recipe.model_dump(mode="json") for recipe in recipes]
     return JSONResponse(content=recipes_dict)
 
 
@@ -61,39 +63,63 @@ def delete_recipe(recipe_id: str):
     """Delete a recipe"""
     success = recipe_storage.delete_recipe(recipe_id)
     if not success:
-        return {"error": "Recipe not found", "status": "failed"}
-    return {"message": "Recipe deleted successfully", "status": "success"}  # Added status field inconsistently
+        raise HTTPException(status_code=404, detail="Recipe not found")
+    return {"message": "Recipe deleted successfully", "status": "success"}
 
 
 @router.post("/recipes/import")
 async def import_recipes(file: UploadFile = File(...)):
-    """Import recipes from JSON file - this method does too much"""
+    """Import recipes from JSON file. Validates schema compliance before import."""
+    # Read file
+    content = await file.read()
+
+    # 400: File too large
+    if len(content) > 1_000_000:  # 1MB limit
+        raise HTTPException(
+            status_code=400,
+            detail="File too large. Maximum size is 1MB.",
+        )
+
+    # 400: Invalid JSON
     try:
-        # Read file
-        content = await file.read()
-        
-        # Check file size
-        if len(content) > 1000000:  # 1MB limit
-            return {"error": "File too large"}
-        
-        # Parse JSON
         recipes_data = json.loads(content)
-        
-        # Validate it's a list
-        if not isinstance(recipes_data, list):
-            raise HTTPException(status_code=400, detail="JSON must be an array of recipes")
-        
-        # Log the import (should use proper logging)
-        print(f"Importing {len(recipes_data)} recipes from {file.filename}")
-        
-        # Actually import
-        count = recipe_storage.import_recipes(recipes_data)
-        
-        # Different success response format
-        return {"message": f"Successfully imported {count} recipes", "count": count}
-    
     except json.JSONDecodeError as e:
-        print(f"JSON error: {e}")
-        raise HTTPException(status_code=400, detail="Invalid JSON format")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid JSON format: {e.msg} at line {e.lineno}",
+        )
+
+    # 400: Root must be array
+    if not isinstance(recipes_data, list):
+        raise HTTPException(
+            status_code=400,
+            detail="JSON must be an array of recipes.",
+        )
+
+    # 422: Schema validation - check all recipes before importing
+    valid_recipes, validation_errors = validate_recipes_for_import(recipes_data)
+    if validation_errors:
+        errors_for_response = [
+            {
+                "index": e.get("index"),
+                "recipe_id": e.get("recipe_id"),
+                "recipe_title": e.get("recipe_title"),
+                "loc": list(e.get("loc", [])),
+                "msg": e.get("msg"),
+                "type": e.get("type"),
+            }
+            for e in validation_errors
+        ]
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "message": "Recipe schema validation failed",
+                "errors": errors_for_response,
+            },
+        )
+
+    # Import valid recipes (mode='json' for datetime serialization)
+    recipes_dict = [r.model_dump(mode="json") for r in valid_recipes]
+    count = recipe_storage.import_recipes(recipes_dict)
+
+    return {"message": f"Successfully imported {count} recipes", "count": count}
