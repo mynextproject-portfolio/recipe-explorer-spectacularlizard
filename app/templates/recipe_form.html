@@ -35,15 +35,12 @@
             </div>
             
             <div class="mb-3">
-                <label for="difficulty" class="form-label">Difficulty Level</label>
-                <select class="form-control" id="difficulty" name="difficulty" required>
-                    <option value="">Select difficulty</option>
-                    <option value="Easy" {% if recipe and recipe.difficulty == 'Easy' %}selected{% endif %}>Easy</option>
-                    <option value="Medium" {% if recipe and recipe.difficulty == 'Medium' %}selected{% endif %}>Medium</option>
-                    <option value="Hard" {% if recipe and recipe.difficulty == 'Hard' %}selected{% endif %}>Hard</option>
-                </select>
+                <label for="cuisine" class="form-label">Cuisine / Region</label>
+                <input type="text" class="form-control" id="cuisine" name="cuisine"
+                       value="{% if recipe and recipe.cuisine %}{{ recipe.cuisine }}{% endif %}"
+                       placeholder="e.g. Italian, French, Southeast Asian">
             </div>
-            
+
             <div class="mb-3">
                 <label for="tags" class="form-label">Tags (comma-separated)</label>
                 <input type="text" class="form-control" id="tags" name="tags" 
@@ -85,8 +82,8 @@
             <!-- Instructions Section -->
             <div class="mb-4">
                 <label for="instructions" class="form-label">Instructions</label>
-                <textarea class="form-control" id="instructions" name="instructions" rows="8" required 
-                          placeholder="Enter complete cooking instructions...">{% if recipe %}{{ recipe.instructions }}{% endif %}</textarea>
+                <textarea class="form-control" id="instructions" name="instructions" rows="8" required
+                          placeholder="Enter each step on a new line...">{% if recipe and recipe.instructions %}{{ recipe.instructions|join('\n') }}{% endif %}</textarea>
             </div>
             
             <!-- Submit Buttons -->

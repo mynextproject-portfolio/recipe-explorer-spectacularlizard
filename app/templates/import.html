@@ -54,15 +54,15 @@
     "title": "Recipe Title",
     "description": "Recipe description",
     "ingredients": ["ingredient 1", "ingredient 2"],
-    "instructions": "First, do step 1.\n\nThen, do step 2.",
+    "instructions": ["Step 1: Do this first.", "Step 2: Then do this.", "Step 3: Finally, do this."],
     "tags": ["tag1", "tag2"],
-    "difficulty": "Easy",
+    "cuisine": "Italian",
     "created_at": "2024-01-01T00:00:00",
     "updated_at": "2024-01-01T00:00:00"
   }
 ]</code></pre>
                 <p class="text-muted">
-                    <small>Note: The <code>id</code>, <code>created_at</code>, and <code>updated_at</code> fields are optional and will be generated automatically if not provided.</small>
+                    <small>Note: The <code>id</code>, <code>created_at</code>, and <code>updated_at</code> fields are optional and will be generated automatically if not provided. Legacy format (instructions as a single string, difficulty field) is also supported and will be migrated on import.</small>
                 </p>
             </div>
         </div>

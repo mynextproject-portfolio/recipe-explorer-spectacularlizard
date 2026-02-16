@@ -18,10 +18,12 @@
         <p class="lead">{{ recipe.description }}</p>
         
         <div class="row mb-4">
+            {% if recipe.cuisine %}
             <div class="col-md-6">
-                <h6>Difficulty Level</h6>
-                <span class="badge bg-{% if recipe.difficulty == 'Easy' %}success{% elif recipe.difficulty == 'Medium' %}warning{% else %}danger{% endif %} fs-6">{{ recipe.difficulty }}</span>
+                <h6>Cuisine / Region</h6>
+                <span class="badge bg-info fs-6">{{ recipe.cuisine }}</span>
             </div>
+            {% endif %}
             {% if recipe.tags %}
             <div class="col-md-6">
                 <h6>Tags</h6>
@@ -49,11 +51,11 @@
         <!-- Instructions -->
         <div class="mb-4">
             <h3>Instructions</h3>
-            <div class="card">
-                <div class="card-body">
-                    <p class="card-text" style="white-space: pre-line;">{{ recipe.instructions }}</p>
-                </div>
-            </div>
+            <ol class="list-group list-group-numbered list-group-flush">
+                {% for step in recipe.instructions %}
+                <li class="list-group-item px-0">{{ step }}</li>
+                {% endfor %}
+            </ol>
         </div>
     </div>
     
@@ -82,7 +84,8 @@
                     <div><strong>Created:</strong> {{ recipe.created_at.strftime('%B %d, %Y') }}</div>
                     <div><strong>Updated:</strong> {{ recipe.updated_at.strftime('%B %d, %Y') }}</div>
                     <div><strong>Ingredients:</strong> {{ recipe.ingredients|length }}</div>
-                    <div><strong>Difficulty:</strong> {{ recipe.difficulty }}</div>
+                    <div><strong>Steps:</strong> {{ recipe.instructions|length }}</div>
+                    {% if recipe.cuisine %}<div><strong>Cuisine:</strong> {{ recipe.cuisine }}</div>{% endif %}
                 </small>
             </div>
         </div>

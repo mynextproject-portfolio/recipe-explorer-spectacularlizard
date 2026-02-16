@@ -56,22 +56,43 @@ class RecipeStorage:
         # Replace all existing recipes
         self.recipes.clear()
         count = 0
-        
+
         for recipe_dict in recipes_data:
             try:
+                # Migrate legacy format: instructions string -> list of steps
+                if isinstance(recipe_dict.get('instructions'), str):
+                    steps = [
+                        s.strip() for s in recipe_dict['instructions'].split('\n\n')
+                        if s.strip()
+                    ]
+                    recipe_dict['instructions'] = steps if steps else [
+                        recipe_dict['instructions']
+                    ]
+
+                # Migrate legacy format: remove difficulty (no longer used)
+                recipe_dict.pop('difficulty', None)
+
+                # Ensure cuisine exists (optional field)
+                if 'cuisine' not in recipe_dict:
+                    recipe_dict['cuisine'] = None
+
                 # Handle datetime strings if they exist
                 if 'created_at' in recipe_dict:
-                    recipe_dict['created_at'] = datetime.fromisoformat(recipe_dict['created_at'])
+                    recipe_dict['created_at'] = datetime.fromisoformat(
+                        recipe_dict['created_at']
+                    )
                 if 'updated_at' in recipe_dict:
-                    recipe_dict['updated_at'] = datetime.fromisoformat(recipe_dict['updated_at'])
-                
+                    recipe_dict['updated_at'] = datetime.fromisoformat(
+                        recipe_dict['updated_at']
+                    )
+
                 recipe = Recipe(**recipe_dict)
                 self.recipes[recipe.id] = recipe
                 count += 1
             except Exception:
                 # Skip invalid recipes
                 continue
-        
+
         return count
 
 
