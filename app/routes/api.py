@@ -34,6 +34,21 @@ def get_recipes(search: Optional[str] = None):
     return {"recipes": combined}
 
 
+@router.get("/recipes/search")
+def search_recipes(q: Optional[str] = None):
+    """Search recipes by query. Accepts 'q' as query parameter. Returns combined internal + external results."""
+    # Alias for GET /api/recipes?search= - supports both 'q' and empty query
+    if q:
+        internal_recipes = recipe_storage.search_recipes(q)
+        external_recipes = themealdb_adapter.search_meals(q)
+        internal_with_source = [_recipe_to_response(r, "internal") for r in internal_recipes]
+        combined = internal_with_source + external_recipes
+    else:
+        internal_recipes = recipe_storage.get_all_recipes()
+        combined = [_recipe_to_response(r, "internal") for r in internal_recipes]
+    return {"recipes": combined}
+
+
 @router.get("/recipes/internal/{recipe_id}")
 def get_recipe_internal(recipe_id: str):
     """Get a recipe by ID from internal storage."""
