@@ -53,6 +53,11 @@ def record_internal(elapsed_ms: float) -> None:
     m = _request_metrics_var.get()
     if m is not None:
         m.internal_ms += elapsed_ms
+    try:
+        from app.services.prometheus_metrics import record_internal_duration
+        record_internal_duration(elapsed_ms / 1000.0)
+    except Exception:
+        pass
 
 
 def record_external(elapsed_ms: float) -> None:
@@ -60,6 +65,11 @@ def record_external(elapsed_ms: float) -> None:
     m = _request_metrics_var.get()
     if m is not None:
         m.external_ms += elapsed_ms
+    try:
+        from app.services.prometheus_metrics import record_external_duration
+        record_external_duration(elapsed_ms / 1000.0)
+    except Exception:
+        pass
 
 
 def record_cache_hit() -> None:

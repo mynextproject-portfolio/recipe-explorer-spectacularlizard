@@ -3,7 +3,9 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from app.core.dependencies import get_recipe_storage
 from app.routes import api, pages
@@ -43,6 +45,18 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # Include routers
 app.include_router(api.router)
 app.include_router(pages.router)
+
+# Prometheus metrics endpoint (import registers metrics)
+from app.services import prometheus_metrics  # noqa: F401, E402
+
+
+@app.get("/metrics")
+def metrics():
+    """Prometheus metrics scrape endpoint."""
+    return Response(
+        content=generate_latest(),
+        media_type=CONTENT_TYPE_LATEST,
+    )
 
 
 # Basic health check

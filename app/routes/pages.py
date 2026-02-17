@@ -7,6 +7,7 @@ from fastapi.templating import Jinja2Templates
 from app.core.abstractions import ExternalRecipeSource, RecipeRepository
 from app.core.dependencies import get_external_recipe_source, get_recipe_storage
 from app.models import RecipeCreate, RecipeUpdate
+from app.services.prometheus_metrics import record_recipe_search
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -63,6 +64,8 @@ def home(
     external: ExternalRecipeSource = Depends(get_external_recipe_source),
 ):
     """Home page with recipe list and search (combined internal + external)"""
+    if search:
+        record_recipe_search(search)
     recipes = _get_combined_recipes(search, storage, external)
 
     return templates.TemplateResponse(
