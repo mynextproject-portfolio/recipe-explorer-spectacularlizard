@@ -1,17 +1,20 @@
 """
 TheMealDB API adapter with proper error handling and data transformation.
 Transforms external API format to match internal Recipe schema.
-Redis caching for external API responses (24h TTL).
+Redis caching for external API responses (24h TTL) via injected CacheBackend.
 """
 
 import re
 import time
-from typing import Any, Callable, List, Optional
+from typing import Any, Callable, List, Optional, TYPE_CHECKING
 import logging
 
 import httpx
 
-from app.services import cache as cache_service
+from app.services.cache import NoOpCacheBackend
+
+if TYPE_CHECKING:
+    from app.core.abstractions import CacheBackend
 
 logger = logging.getLogger(__name__)
 
@@ -100,10 +103,12 @@ class TheMealDBAdapter:
         base_url: str = BASE_URL,
         timeout: float = DEFAULT_TIMEOUT,
         on_request_done: Optional[Callable[[float], None]] = None,
+        cache: Optional["CacheBackend"] = None,
     ):
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self._on_request_done = on_request_done
+        self._cache = cache if cache is not None else NoOpCacheBackend()
 
     def _record_timing(self, elapsed_ms: float) -> None:
         """Call timing callback if configured."""
@@ -122,12 +127,12 @@ class TheMealDBAdapter:
         if not query or not str(query).strip():
             return []
 
-        # Check cache first (only when Redis is available)
-        if cache_service.is_available():
+        # Check cache first (when cache backend is available)
+        if self._cache.is_available():
             try:
                 from app.services.metrics import record_cache_hit, record_cache_miss
 
-                cached = cache_service.cache_get_search(query)
+                cached = self._cache.get_search(query)
                 if cached is not None:
                     record_cache_hit()
                     self._record_timing(0)
@@ -179,7 +184,7 @@ class TheMealDBAdapter:
                         )
 
         try:
-            cache_service.cache_set_search(query, results)
+            self._cache.set_search(query, results)
         except Exception:
             pass
         return results
@@ -193,12 +198,12 @@ class TheMealDBAdapter:
         if not meal_id or not str(meal_id).strip():
             return None
 
-        # Check cache first (only when Redis is available)
-        if cache_service.is_available():
+        # Check cache first (when cache backend is available)
+        if self._cache.is_available():
             try:
                 from app.services.metrics import record_cache_hit, record_cache_miss
 
-                cached = cache_service.cache_get_meal(meal_id)
+                cached = self._cache.get_meal(meal_id)
                 if cached is not None:
                     if cached == "__CACHED_NONE__":
                         record_cache_hit()
@@ -242,7 +247,7 @@ class TheMealDBAdapter:
         meals = data.get("meals")
         if not meals or not isinstance(meals, list):
             try:
-                cache_service.cache_set_meal(meal_id, None)
+                self._cache.set_meal(meal_id, None)
             except Exception:
                 pass
             return None
@@ -250,7 +255,7 @@ class TheMealDBAdapter:
         meal = meals[0] if isinstance(meals[0], dict) else None
         if not meal:
             try:
-                cache_service.cache_set_meal(meal_id, None)
+                self._cache.set_meal(meal_id, None)
             except Exception:
                 pass
             return None
@@ -258,14 +263,10 @@ class TheMealDBAdapter:
         try:
             result = transform_meal_to_recipe(meal)
             try:
-                cache_service.cache_set_meal(meal_id, result)
+                self._cache.set_meal(meal_id, result)
             except Exception:
                 pass
             return result
         except Exception as e:
             logger.warning("Failed to transform meal %s: %s", meal_id, e)
             return None
-
-
-# Singleton instance
-themealdb_adapter = TheMealDBAdapter()
