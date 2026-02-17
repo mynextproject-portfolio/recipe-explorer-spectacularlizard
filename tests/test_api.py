@@ -364,7 +364,7 @@ def test_get_recipe_by_id_resolves_external(client, mock_themealdb):
 
 
 def test_recipes_response_includes_metrics(client, clean_storage):
-    """GET /api/recipes returns _metrics with internal_ms and external_ms"""
+    """GET /api/recipes returns _metrics with internal_ms, external_ms, cache_hits, cache_misses"""
     response = client.get("/api/recipes")
     assert response.status_code == 200
     data = response.json()
@@ -372,8 +372,12 @@ def test_recipes_response_includes_metrics(client, clean_storage):
     m = data["_metrics"]
     assert "internal_ms" in m
     assert "external_ms" in m
+    assert "cache_hits" in m
+    assert "cache_misses" in m
     assert isinstance(m["internal_ms"], (int, float))
     assert isinstance(m["external_ms"], (int, float))
+    assert isinstance(m["cache_hits"], int)
+    assert isinstance(m["cache_misses"], int)
 
 
 def test_search_response_includes_metrics(client, clean_storage, sample_recipe_data, mock_themealdb):
@@ -393,7 +397,7 @@ def test_search_response_includes_metrics(client, clean_storage, sample_recipe_d
 
 
 def test_metrics_endpoint_returns_aggregate(client, clean_storage, sample_recipe_data, mock_themealdb):
-    """GET /api/metrics returns aggregate internal/external stats"""
+    """GET /api/metrics returns aggregate internal/external/cache stats"""
     mock_themealdb.search_meals.return_value = []
     mock_themealdb.get_meal_by_id.return_value = None
     client.post("/api/recipes", json=sample_recipe_data)
@@ -404,7 +408,11 @@ def test_metrics_endpoint_returns_aggregate(client, clean_storage, sample_recipe
     data = response.json()
     assert "internal" in data
     assert "external" in data
+    assert "cache" in data
     assert "count" in data["internal"]
     assert "total_ms" in data["internal"]
     assert "avg_ms" in data["internal"]
     assert data["internal"]["count"] >= 2  # at least 2 internal queries
+    assert "hits" in data["cache"]
+    assert "misses" in data["cache"]
+    assert "hit_rate_percent" in data["cache"]

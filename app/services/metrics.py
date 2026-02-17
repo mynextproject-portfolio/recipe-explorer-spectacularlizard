@@ -23,11 +23,15 @@ class RequestMetrics:
 
     internal_ms: float = 0.0
     external_ms: float = 0.0
+    cache_hits: int = 0
+    cache_misses: int = 0
 
     def to_dict(self) -> dict:
         return {
             "internal_ms": round(self.internal_ms, 2),
             "external_ms": round(self.external_ms, 2),
+            "cache_hits": self.cache_hits,
+            "cache_misses": self.cache_misses,
         }
 
 
@@ -55,6 +59,20 @@ def record_external(elapsed_ms: float) -> None:
     m = _request_metrics_var.get()
     if m is not None:
         m.external_ms += elapsed_ms
+
+
+def record_cache_hit() -> None:
+    """Record a cache hit (MealDB response served from Redis)."""
+    m = _request_metrics_var.get()
+    if m is not None:
+        m.cache_hits += 1
+
+
+def record_cache_miss() -> None:
+    """Record a cache miss (MealDB API was called)."""
+    m = _request_metrics_var.get()
+    if m is not None:
+        m.cache_misses += 1
 
 
 def timed_internal() -> "ContextManager[float]":
@@ -101,22 +119,40 @@ class AggregateMetrics:
     external_count: int = 0
     internal_total_ms: float = 0.0
     external_total_ms: float = 0.0
+    cache_hits: int = 0
+    cache_misses: int = 0
 
-    def record(self, internal_ms: float, external_ms: float) -> None:
+    def record(
+        self,
+        internal_ms: float,
+        external_ms: float,
+        cache_hits: int = 0,
+        cache_misses: int = 0,
+    ) -> None:
         if internal_ms > 0:
             self.internal_count += 1
             self.internal_total_ms += internal_ms
         if external_ms > 0:
             self.external_count += 1
             self.external_total_ms += external_ms
-        if internal_ms > 0 or external_ms > 0:
+        self.cache_hits += cache_hits
+        self.cache_misses += cache_misses
+        if internal_ms > 0 or external_ms > 0 or cache_hits > 0 or cache_misses > 0:
             logger.debug(
-                "Request metrics: internal=%.2fms external=%.2fms",
+                "Request metrics: internal=%.2fms external=%.2fms hits=%d misses=%d",
                 internal_ms,
                 external_ms,
+                cache_hits,
+                cache_misses,
             )
 
     def to_dict(self) -> dict:
+        total_cache_ops = self.cache_hits + self.cache_misses
+        hit_rate = (
+            round(100 * self.cache_hits / total_cache_ops, 2)
+            if total_cache_ops > 0
+            else 0
+        )
         return {
             "internal": {
                 "count": self.internal_count,
@@ -131,6 +167,11 @@ class AggregateMetrics:
                 "avg_ms": round(self.external_total_ms / self.external_count, 2)
                 if self.external_count > 0
                 else 0,
+            },
+            "cache": {
+                "hits": self.cache_hits,
+                "misses": self.cache_misses,
+                "hit_rate_percent": hit_rate,
             },
         }
 
