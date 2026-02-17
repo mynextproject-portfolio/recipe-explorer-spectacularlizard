@@ -14,8 +14,14 @@ MAX_CUISINE_LENGTH = 100
 
 class Recipe(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    title: str = Field(min_length=1, max_length=MAX_TITLE_LENGTH, description="Recipe title")
-    description: str = Field(min_length=1, max_length=MAX_DESCRIPTION_LENGTH, description="Recipe description")
+    title: str = Field(
+        min_length=1, max_length=MAX_TITLE_LENGTH, description="Recipe title"
+    )
+    description: str = Field(
+        min_length=1,
+        max_length=MAX_DESCRIPTION_LENGTH,
+        description="Recipe description",
+    )
     ingredients: List[str] = Field(
         min_length=1,
         max_length=MAX_INGREDIENTS,
@@ -26,15 +32,25 @@ class Recipe(BaseModel):
         max_length=MAX_INSTRUCTIONS,
         description="Step-by-step instructions",
     )
-    tags: List[str] = Field(default_factory=list, max_length=MAX_TAGS, description="Recipe tags")
-    cuisine: Optional[str] = Field(default=None, max_length=MAX_CUISINE_LENGTH, description="Cuisine type")
+    tags: List[str] = Field(
+        default_factory=list, max_length=MAX_TAGS, description="Recipe tags"
+    )
+    cuisine: Optional[str] = Field(
+        default=None, max_length=MAX_CUISINE_LENGTH, description="Cuisine type"
+    )
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
 
 
 class RecipeCreate(BaseModel):
-    title: str = Field(min_length=1, max_length=MAX_TITLE_LENGTH, description="Recipe title")
-    description: str = Field(min_length=1, max_length=MAX_DESCRIPTION_LENGTH, description="Recipe description")
+    title: str = Field(
+        min_length=1, max_length=MAX_TITLE_LENGTH, description="Recipe title"
+    )
+    description: str = Field(
+        min_length=1,
+        max_length=MAX_DESCRIPTION_LENGTH,
+        description="Recipe description",
+    )
     ingredients: List[str] = Field(
         min_length=1,
         max_length=MAX_INGREDIENTS,
@@ -45,13 +61,23 @@ class RecipeCreate(BaseModel):
         max_length=MAX_INSTRUCTIONS,
         description="Step-by-step instructions",
     )
-    tags: List[str] = Field(default_factory=list, max_length=MAX_TAGS, description="Recipe tags")
-    cuisine: Optional[str] = Field(default=None, max_length=MAX_CUISINE_LENGTH, description="Cuisine type")
+    tags: List[str] = Field(
+        default_factory=list, max_length=MAX_TAGS, description="Recipe tags"
+    )
+    cuisine: Optional[str] = Field(
+        default=None, max_length=MAX_CUISINE_LENGTH, description="Cuisine type"
+    )
 
 
 class RecipeUpdate(BaseModel):
-    title: str = Field(min_length=1, max_length=MAX_TITLE_LENGTH, description="Recipe title")
-    description: str = Field(min_length=1, max_length=MAX_DESCRIPTION_LENGTH, description="Recipe description")
+    title: str = Field(
+        min_length=1, max_length=MAX_TITLE_LENGTH, description="Recipe title"
+    )
+    description: str = Field(
+        min_length=1,
+        max_length=MAX_DESCRIPTION_LENGTH,
+        description="Recipe description",
+    )
     ingredients: List[str] = Field(
         min_length=1,
         max_length=MAX_INGREDIENTS,
@@ -63,4 +89,6 @@ class RecipeUpdate(BaseModel):
         description="Step-by-step instructions",
     )
     tags: List[str] = Field(max_length=MAX_TAGS, description="Recipe tags")
-    cuisine: Optional[str] = Field(default=None, max_length=MAX_CUISINE_LENGTH, description="Cuisine type")
+    cuisine: Optional[str] = Field(
+        default=None, max_length=MAX_CUISINE_LENGTH, description="Cuisine type"
+    )

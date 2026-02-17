@@ -17,11 +17,7 @@ def migrate_legacy_recipe_format(recipe_dict: dict) -> dict:
 
     # Migrate instructions: string -> list
     if isinstance(data.get("instructions"), str):
-        steps = [
-            s.strip()
-            for s in data["instructions"].split("\n\n")
-            if s.strip()
-        ]
+        steps = [s.strip() for s in data["instructions"].split("\n\n") if s.strip()]
         data["instructions"] = steps if steps else [data["instructions"]]
 
     # Remove obsolete fields
@@ -95,8 +91,14 @@ def validate_recipes_for_import(
             for e in errs:
                 err_copy = dict(e)
                 err_copy["index"] = i
-                err_copy["recipe_id"] = item.get("id", "?") if isinstance(item, dict) else "?"
-                err_copy["recipe_title"] = item.get("title", "<no title>") if isinstance(item, dict) else "<no title>"
+                err_copy["recipe_id"] = (
+                    item.get("id", "?") if isinstance(item, dict) else "?"
+                )
+                err_copy["recipe_title"] = (
+                    item.get("title", "<no title>")
+                    if isinstance(item, dict)
+                    else "<no title>"
+                )
                 all_errors.append(err_copy)
         elif recipe:
             valid.append(recipe)

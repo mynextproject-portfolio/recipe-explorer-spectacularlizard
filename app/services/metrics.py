@@ -3,6 +3,7 @@ Performance metrics collection for internal vs external recipe queries.
 Tracks response times for internal storage queries and external MealDB API calls.
 Uses contextvars for request-scoped state (async-safe).
 """
+
 import logging
 import time
 from contextvars import ContextVar

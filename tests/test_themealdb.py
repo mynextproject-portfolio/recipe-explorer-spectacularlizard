@@ -1,6 +1,7 @@
 """
 Tests for TheMealDB adapter: transformation, error handling, and integration.
 """
+
 from unittest.mock import patch, MagicMock
 
 import pytest
@@ -8,7 +9,6 @@ import pytest
 from app.adapters.themealdb import (
     TheMealDBAdapter,
     transform_meal_to_recipe,
-    themealdb_adapter,
 )
 
 
@@ -36,7 +36,10 @@ def test_transform_meal_to_recipe():
     assert result["title"] == "Teriyaki Chicken Casserole"
     assert result["cuisine"] == "Japanese"
     assert result["source"] == "external"
-    assert result["image_url"] == "https://www.themealdb.com/images/media/meals/wvpsxx1468256321.jpg"
+    assert (
+        result["image_url"]
+        == "https://www.themealdb.com/images/media/meals/wvpsxx1468256321.jpg"
+    )
 
     # Ingredients: measure + ingredient
     assert "3/4 cup soy sauce" in result["ingredients"]

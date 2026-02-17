@@ -1,5 +1,5 @@
 import json
-from typing import Any, List, Optional
+from typing import Any, Optional
 
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from fastapi.responses import JSONResponse
@@ -52,7 +52,9 @@ def get_recipes(search: Optional[str] = None):
             internal_recipes = recipe_storage.search_recipes(search)
         with timed_external():
             external_recipes = themealdb_adapter.search_meals(search)
-        internal_with_source = [_recipe_to_response(r, "internal") for r in internal_recipes]
+        internal_with_source = [
+            _recipe_to_response(r, "internal") for r in internal_recipes
+        ]
         combined = internal_with_source + external_recipes
     else:
         with timed_internal():
@@ -71,7 +73,9 @@ def search_recipes(q: Optional[str] = None):
             internal_recipes = recipe_storage.search_recipes(q)
         with timed_external():
             external_recipes = themealdb_adapter.search_meals(q)
-        internal_with_source = [_recipe_to_response(r, "internal") for r in internal_recipes]
+        internal_with_source = [
+            _recipe_to_response(r, "internal") for r in internal_recipes
+        ]
         combined = internal_with_source + external_recipes
     else:
         with timed_internal():

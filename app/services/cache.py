@@ -2,6 +2,7 @@
 Redis cache service for external API responses.
 Uses 24-hour TTL. Gracefully degrades to no caching when Redis is unavailable.
 """
+
 import json
 import logging
 import os

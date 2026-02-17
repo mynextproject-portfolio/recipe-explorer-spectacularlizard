@@ -1,6 +1,7 @@
 """
 Test fixtures for Recipe Explorer tests.
 """
+
 import os
 from unittest.mock import patch, MagicMock
 
@@ -60,7 +61,7 @@ def sample_recipe_data():
         "ingredients": ["ingredient 1", "ingredient 2"],
         "instructions": ["First, do step 1.", "Then, do step 2."],
         "tags": ["test"],
-        "cuisine": "Test Cuisine"
+        "cuisine": "Test Cuisine",
     }
 
 
