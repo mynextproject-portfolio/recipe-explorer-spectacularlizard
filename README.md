@@ -31,6 +31,16 @@ docker run -p 8000:8000 recipe-explorer
 
 Visit **http://localhost:8000**
 
+### Run with Docker Compose (Redis caching)
+
+MealDB API responses are cached in Redis (24h TTL) for improved search performance:
+
+```bash
+docker compose up
+```
+
+Visit **http://localhost:8000**. Use `GET /api/metrics` to monitor cache hits and hit rate.
+
 ## Sample Data
 
 Upload the `sample-recipes.json` file using the "Import Recipes" page to get started with 3 example recipes (Poutine, Shuba, Guo Bao Rou).
@@ -65,6 +75,7 @@ Exit code 0 = valid, 1 = validation failed.
 - `GET /api/recipes` - List/search recipes
 - `POST /api/recipes` - Create recipe
 - `GET /api/recipes/{id}` - Get recipe
+- `GET /api/metrics` - Performance metrics (internal/external query times, cache hits)
 - `PUT /api/recipes/{id}` - Update recipe
 - `DELETE /api/recipes/{id}` - Delete recipe
 - `POST /api/recipes/import` - Import JSON

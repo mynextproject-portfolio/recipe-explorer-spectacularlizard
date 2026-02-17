@@ -1,6 +1,7 @@
 """
 Test fixtures for Recipe Explorer tests.
 """
+import os
 from unittest.mock import patch, MagicMock
 
 import pytest
@@ -9,6 +10,9 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.services.metrics import aggregate_metrics
 from app.services.storage import recipe_storage
+
+# Disable Redis cache during tests (no Redis required)
+os.environ.setdefault("REDIS_URL", "")
 
 
 @pytest.fixture
@@ -42,6 +46,8 @@ def reset_aggregate_metrics():
     aggregate_metrics.external_count = 0
     aggregate_metrics.internal_total_ms = 0.0
     aggregate_metrics.external_total_ms = 0.0
+    aggregate_metrics.cache_hits = 0
+    aggregate_metrics.cache_misses = 0
     yield
 
 

@@ -32,7 +32,12 @@ def _build_response(data: dict, include_metrics: bool = True) -> dict:
         m = current_metrics()
         if m is not None:
             metrics_dict = m.to_dict()
-            aggregate_metrics.record(m.internal_ms, m.external_ms)
+            aggregate_metrics.record(
+                m.internal_ms,
+                m.external_ms,
+                cache_hits=m.cache_hits,
+                cache_misses=m.cache_misses,
+            )
             data = {**data, "_metrics": metrics_dict}
     return data
 

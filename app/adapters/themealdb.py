@@ -1,6 +1,7 @@
 """
 TheMealDB API adapter with proper error handling and data transformation.
 Transforms external API format to match internal Recipe schema.
+Redis caching for external API responses (24h TTL).
 """
 import re
 import time
@@ -8,6 +9,8 @@ from typing import Any, Callable, List, Optional
 import logging
 
 import httpx
+
+from app.services import cache as cache_service
 
 logger = logging.getLogger(__name__)
 
@@ -113,9 +116,24 @@ class TheMealDBAdapter:
         """
         Search meals by name. Returns list of transformed recipe dicts.
         On error, returns empty list (graceful degradation).
+        Uses Redis cache when available (24h TTL).
         """
         if not query or not str(query).strip():
             return []
+
+        # Check cache first (only when Redis is available)
+        if cache_service.is_available():
+            try:
+                from app.services.metrics import record_cache_hit, record_cache_miss
+
+                cached = cache_service.cache_get_search(query)
+                if cached is not None:
+                    record_cache_hit()
+                    self._record_timing(0)
+                    return cached
+                record_cache_miss()
+            except Exception:
+                pass
 
         url = f"{self.base_url}/search.php"
         params = {"s": str(query).strip()}
@@ -143,27 +161,52 @@ class TheMealDBAdapter:
             self._record_timing((time.perf_counter() - start) * 1000)
             return []
 
-        self._record_timing((time.perf_counter() - start) * 1000)
+        elapsed_ms = (time.perf_counter() - start) * 1000
+        self._record_timing(elapsed_ms)
         meals = data.get("meals")
         if meals is None:
-            return []
+            results = []
+        else:
+            results = []
+            for m in meals:
+                if isinstance(m, dict):
+                    try:
+                        results.append(transform_meal_to_recipe(m))
+                    except Exception as e:
+                        logger.warning("Failed to transform meal %s: %s", m.get("idMeal"), e)
 
-        results: list[dict[str, Any]] = []
-        for m in meals:
-            if isinstance(m, dict):
-                try:
-                    results.append(transform_meal_to_recipe(m))
-                except Exception as e:
-                    logger.warning("Failed to transform meal %s: %s", m.get("idMeal"), e)
+        try:
+            cache_service.cache_set_search(query, results)
+        except Exception:
+            pass
         return results
 
     def get_meal_by_id(self, meal_id: str) -> Optional[dict[str, Any]]:
         """
         Lookup full meal details by id. Returns transformed recipe dict or None.
         On error, returns None (graceful degradation).
+        Uses Redis cache when available (24h TTL).
         """
         if not meal_id or not str(meal_id).strip():
             return None
+
+        # Check cache first (only when Redis is available)
+        if cache_service.is_available():
+            try:
+                from app.services.metrics import record_cache_hit, record_cache_miss
+
+                cached = cache_service.cache_get_meal(meal_id)
+                if cached is not None:
+                    if cached == "__CACHED_NONE__":
+                        record_cache_hit()
+                        self._record_timing(0)
+                        return None
+                    record_cache_hit()
+                    self._record_timing(0)
+                    return cached
+                record_cache_miss()
+            except Exception:
+                pass
 
         url = f"{self.base_url}/lookup.php"
         params = {"i": str(meal_id).strip()}
@@ -191,17 +234,31 @@ class TheMealDBAdapter:
             self._record_timing((time.perf_counter() - start) * 1000)
             return None
 
-        self._record_timing((time.perf_counter() - start) * 1000)
+        elapsed_ms = (time.perf_counter() - start) * 1000
+        self._record_timing(elapsed_ms)
         meals = data.get("meals")
         if not meals or not isinstance(meals, list):
+            try:
+                cache_service.cache_set_meal(meal_id, None)
+            except Exception:
+                pass
             return None
 
         meal = meals[0] if isinstance(meals[0], dict) else None
         if not meal:
+            try:
+                cache_service.cache_set_meal(meal_id, None)
+            except Exception:
+                pass
             return None
 
         try:
-            return transform_meal_to_recipe(meal)
+            result = transform_meal_to_recipe(meal)
+            try:
+                cache_service.cache_set_meal(meal_id, result)
+            except Exception:
+                pass
+            return result
         except Exception as e:
             logger.warning("Failed to transform meal %s: %s", meal_id, e)
             return None
