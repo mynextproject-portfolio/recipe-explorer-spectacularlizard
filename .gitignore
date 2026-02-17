@@ -30,3 +30,6 @@ Thumbs.db
 # Environment
 .env
 *.log
+
+# SQLite data
+recipes.db

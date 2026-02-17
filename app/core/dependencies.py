@@ -3,6 +3,7 @@ FastAPI dependency injection providers.
 Use Depends(get_recipe_storage), etc. in route handlers.
 """
 
+import os
 from typing import Optional
 
 from app.adapters.themealdb import TheMealDBAdapter
@@ -21,7 +22,8 @@ def get_recipe_storage() -> RecipeRepository:
     """Provide RecipeRepository. Used as Depends(get_recipe_storage)."""
     global _recipe_storage
     if _recipe_storage is None:
-        _recipe_storage = RecipeStorage()
+        db_path = os.environ.get("RECIPE_DB_PATH", "recipes.db")
+        _recipe_storage = RecipeStorage(db_path=db_path)
     return _recipe_storage
 
 
@@ -51,7 +53,7 @@ def get_noop_cache() -> CacheBackend:
 
 def create_fresh_recipe_storage() -> RecipeStorage:
     """Create new RecipeStorage instance. Use in tests for clean state."""
-    return RecipeStorage()
+    return RecipeStorage(db_path=None)  # None => :memory: for isolated tests
 
 
 def create_mock_external_source(cache: Optional[CacheBackend] = None) -> TheMealDBAdapter:
