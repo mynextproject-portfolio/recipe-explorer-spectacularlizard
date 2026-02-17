@@ -31,5 +31,6 @@ Thumbs.db
 .env
 *.log
 
+# Local data
 # SQLite data
 recipes.db

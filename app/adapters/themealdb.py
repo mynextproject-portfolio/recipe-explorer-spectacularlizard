@@ -131,13 +131,23 @@ class TheMealDBAdapter:
         if self._cache.is_available():
             try:
                 from app.services.metrics import record_cache_hit, record_cache_miss
+                from app.services.prometheus_metrics import record_cache_hit as prom_record_hit, record_cache_miss as prom_record_miss
 
                 cached = self._cache.get_search(query)
                 if cached is not None:
                     record_cache_hit()
+                    prom_record_hit("search")
                     self._record_timing(0)
                     return cached
                 record_cache_miss()
+                prom_record_miss("search")
+            except Exception:
+                pass
+        else:
+            # Cache unavailable: record as miss (we're calling the API)
+            try:
+                from app.services.prometheus_metrics import record_cache_miss
+                record_cache_miss("search")
             except Exception:
                 pass
 
@@ -150,25 +160,23 @@ class TheMealDBAdapter:
                 response = client.get(url, params=params)
                 response.raise_for_status()
                 data = response.json()
-        except httpx.TimeoutException as e:
-            logger.warning("TheMealDB search timed out: %s", e)
+        except (httpx.TimeoutException, httpx.ConnectError, httpx.HTTPStatusError, Exception) as e:
+            logger.warning("TheMealDB search error: %s", e)
             self._record_timing((time.perf_counter() - start) * 1000)
-            return []
-        except httpx.ConnectError as e:
-            logger.warning("TheMealDB connection failed: %s", e)
-            self._record_timing((time.perf_counter() - start) * 1000)
-            return []
-        except httpx.HTTPStatusError as e:
-            logger.warning("TheMealDB HTTP error %s: %s", e.response.status_code, e)
-            self._record_timing((time.perf_counter() - start) * 1000)
-            return []
-        except Exception as e:
-            logger.warning("TheMealDB unexpected error: %s", e)
-            self._record_timing((time.perf_counter() - start) * 1000)
+            try:
+                from app.services.prometheus_metrics import record_mealdb_api
+                record_mealdb_api("search", success=False)
+            except Exception:
+                pass
             return []
 
         elapsed_ms = (time.perf_counter() - start) * 1000
         self._record_timing(elapsed_ms)
+        try:
+            from app.services.prometheus_metrics import record_mealdb_api
+            record_mealdb_api("search", success=True)
+        except Exception:
+            pass
         meals = data.get("meals")
         if meals is None:
             results = []
@@ -202,17 +210,28 @@ class TheMealDBAdapter:
         if self._cache.is_available():
             try:
                 from app.services.metrics import record_cache_hit, record_cache_miss
+                from app.services.prometheus_metrics import record_cache_hit as prom_record_hit, record_cache_miss as prom_record_miss
 
                 cached = self._cache.get_meal(meal_id)
                 if cached is not None:
                     if cached == "__CACHED_NONE__":
                         record_cache_hit()
+                        prom_record_hit("meal")
                         self._record_timing(0)
                         return None
                     record_cache_hit()
+                    prom_record_hit("meal")
                     self._record_timing(0)
                     return cached
                 record_cache_miss()
+                prom_record_miss("meal")
+            except Exception:
+                pass
+        else:
+            # Cache unavailable: record as miss (we're calling the API)
+            try:
+                from app.services.prometheus_metrics import record_cache_miss
+                record_cache_miss("meal")
             except Exception:
                 pass
 
@@ -225,25 +244,23 @@ class TheMealDBAdapter:
                 response = client.get(url, params=params)
                 response.raise_for_status()
                 data = response.json()
-        except httpx.TimeoutException:
-            logger.warning("TheMealDB lookup timed out: %s", meal_id)
+        except (httpx.TimeoutException, httpx.ConnectError, httpx.HTTPStatusError, Exception) as e:
+            logger.warning("TheMealDB lookup error: %s", e)
             self._record_timing((time.perf_counter() - start) * 1000)
-            return None
-        except httpx.ConnectError as e:
-            logger.warning("TheMealDB connection failed: %s", e)
-            self._record_timing((time.perf_counter() - start) * 1000)
-            return None
-        except httpx.HTTPStatusError as e:
-            logger.warning("TheMealDB HTTP error: %s", e)
-            self._record_timing((time.perf_counter() - start) * 1000)
-            return None
-        except Exception as e:
-            logger.warning("TheMealDB unexpected error: %s", e)
-            self._record_timing((time.perf_counter() - start) * 1000)
+            try:
+                from app.services.prometheus_metrics import record_mealdb_api
+                record_mealdb_api("meal", success=False)
+            except Exception:
+                pass
             return None
 
         elapsed_ms = (time.perf_counter() - start) * 1000
         self._record_timing(elapsed_ms)
+        try:
+            from app.services.prometheus_metrics import record_mealdb_api
+            record_mealdb_api("meal", success=True)
+        except Exception:
+            pass
         meals = data.get("meals")
         if not meals or not isinstance(meals, list):
             try:

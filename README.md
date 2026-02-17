@@ -31,15 +31,20 @@ docker run -p 8000:8000 recipe-explorer
 
 Visit **http://localhost:8000**
 
-### Run with Docker Compose (Redis caching)
+### Run with Docker Compose (Redis caching + Prometheus)
 
-MealDB API responses are cached in Redis (24h TTL) for improved search performance:
+MealDB API responses are cached in Redis (24h TTL) for improved search performance. Prometheus collects metrics for cache performance, API usage, and recipe popularity:
 
 ```bash
 docker compose up
 ```
 
-Visit **http://localhost:8000**. Use `GET /api/metrics` to monitor cache hits and hit rate.
+- **App:** http://localhost:8000
+- **Prometheus UI:** http://localhost:9090
+- **Grafana:** http://localhost:3000 (admin / admin)
+- **Metrics endpoint:** http://localhost:8000/metrics (Prometheus format)
+
+Use `GET /api/metrics` for JSON aggregate metrics or `/metrics` for Prometheus scraping. Grafana is pre-configured with Prometheus as a datasource—add dashboards to visualize cache hit rate, API latency, and recipe search popularity.
 
 ## Sample Data
 
@@ -75,7 +80,8 @@ Exit code 0 = valid, 1 = validation failed.
 - `GET /api/recipes` - List/search recipes
 - `POST /api/recipes` - Create recipe
 - `GET /api/recipes/{id}` - Get recipe
-- `GET /api/metrics` - Performance metrics (internal/external query times, cache hits)
+- `GET /api/metrics` - Performance metrics (JSON, internal/external query times, cache hits)
+- `GET /metrics` - Prometheus metrics (cache hit/miss, response times, recipe popularity, MealDB API success/failure)
 - `PUT /api/recipes/{id}` - Update recipe
 - `DELETE /api/recipes/{id}` - Delete recipe
 - `POST /api/recipes/import` - Import JSON

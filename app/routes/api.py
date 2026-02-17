@@ -14,6 +14,7 @@ from app.services.metrics import (
     timed_internal,
     timed_external,
 )
+from app.services.prometheus_metrics import record_recipe_search
 from app.validation import validate_recipes_for_import
 
 router = APIRouter(prefix="/api")
@@ -50,6 +51,8 @@ def get_recipes(
 ):
     """Get all recipes or search by title. Combines internal and external sources when searching."""
     start_request_metrics()
+    if search:
+        record_recipe_search(search)
     # TODO: Add pagination when we have more than 100 recipes
     if search:
         with timed_internal():
@@ -76,6 +79,8 @@ def search_recipes(
 ):
     """Search recipes by query. Accepts 'q' as query parameter. Returns combined internal + external results."""
     start_request_metrics()
+    if q:
+        record_recipe_search(q)
     if q:
         with timed_internal():
             internal_recipes = storage.search_recipes(q)
