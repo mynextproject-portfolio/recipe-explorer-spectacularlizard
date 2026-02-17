@@ -32,4 +32,5 @@ Thumbs.db
 *.log
 
 # Local data
+# SQLite data
 recipes.db
