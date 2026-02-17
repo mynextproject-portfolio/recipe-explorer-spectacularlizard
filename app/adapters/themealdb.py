@@ -3,6 +3,7 @@ TheMealDB API adapter with proper error handling and data transformation.
 Transforms external API format to match internal Recipe schema.
 Redis caching for external API responses (24h TTL).
 """
+
 import re
 import time
 from typing import Any, Callable, List, Optional
@@ -173,7 +174,9 @@ class TheMealDBAdapter:
                     try:
                         results.append(transform_meal_to_recipe(m))
                     except Exception as e:
-                        logger.warning("Failed to transform meal %s: %s", m.get("idMeal"), e)
+                        logger.warning(
+                            "Failed to transform meal %s: %s", m.get("idMeal"), e
+                        )
 
         try:
             cache_service.cache_set_search(query, results)
@@ -217,7 +220,7 @@ class TheMealDBAdapter:
                 response = client.get(url, params=params)
                 response.raise_for_status()
                 data = response.json()
-        except httpx.TimeoutException as e:
+        except httpx.TimeoutException:
             logger.warning("TheMealDB lookup timed out: %s", meal_id)
             self._record_timing((time.perf_counter() - start) * 1000)
             return None

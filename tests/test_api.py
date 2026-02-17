@@ -38,13 +38,13 @@ def test_create_and_get_recipe(client, clean_storage, sample_recipe_data):
     # Create recipe
     create_response = client.post("/api/recipes", json=sample_recipe_data)
     assert create_response.status_code == 200
-    
+
     recipe = create_response.json()
     assert "id" in recipe
     assert "title" in recipe
     assert "created_at" in recipe
     assert recipe["title"] == sample_recipe_data["title"]
-    
+
     # Get recipe
     get_response = client.get(f"/api/recipes/{recipe['id']}")
     assert get_response.status_code == 200
@@ -169,7 +169,9 @@ def test_create_recipe_422_empty_ingredients(client, clean_storage, sample_recip
     assert "detail" in response.json()
 
 
-def test_create_recipe_422_empty_instructions(client, clean_storage, sample_recipe_data):
+def test_create_recipe_422_empty_instructions(
+    client, clean_storage, sample_recipe_data
+):
     """Contract test: POST /api/recipes returns 422 for no instructions"""
     bad_data = {**sample_recipe_data, "instructions": []}
     response = client.post("/api/recipes", json=bad_data)
@@ -380,7 +382,9 @@ def test_recipes_response_includes_metrics(client, clean_storage):
     assert isinstance(m["cache_misses"], int)
 
 
-def test_search_response_includes_metrics(client, clean_storage, sample_recipe_data, mock_themealdb):
+def test_search_response_includes_metrics(
+    client, clean_storage, sample_recipe_data, mock_themealdb
+):
     """GET /api/recipes?search= returns metrics showing both internal and external timing"""
     mock_themealdb.search_meals.return_value = [
         {"id": "external-1", "title": "External", "source": "external"}
@@ -396,7 +400,9 @@ def test_search_response_includes_metrics(client, clean_storage, sample_recipe_d
     assert data["_metrics"]["external_ms"] >= 0
 
 
-def test_metrics_endpoint_returns_aggregate(client, clean_storage, sample_recipe_data, mock_themealdb):
+def test_metrics_endpoint_returns_aggregate(
+    client, clean_storage, sample_recipe_data, mock_themealdb
+):
     """GET /api/metrics returns aggregate internal/external/cache stats"""
     mock_themealdb.search_meals.return_value = []
     mock_themealdb.get_meal_by_id.return_value = None

@@ -60,10 +60,15 @@ def validate_recipes_file(file_path: Path) -> tuple[list[dict], list[str]]:
         recipe, errs = validate_recipe_for_import(item)
         if errs:
             recipe_id = item.get("id", "?") if isinstance(item, dict) else "?"
-            title = item.get("title", "<no title>") if isinstance(item, dict) else "<no title>"
+            title = (
+                item.get("title", "<no title>")
+                if isinstance(item, dict)
+                else "<no title>"
+            )
             err_details = [f"  - {e.get('loc', '?')}: {e['msg']}" for e in errs]
-            msg = f"Recipe at index {i} (id={recipe_id}, title={title!r}):\n" + "\n".join(
-                err_details
+            msg = (
+                f"Recipe at index {i} (id={recipe_id}, title={title!r}):\n"
+                + "\n".join(err_details)
             )
             messages.append(msg)
             errors.append(
@@ -82,7 +87,10 @@ def main() -> int:
     """Run validation on given file(s)."""
     if len(sys.argv) < 2:
         print(__doc__, file=sys.stderr)
-        print("\nUsage: python scripts/validate_recipes.py <file.json> [file2.json ...]\n", file=sys.stderr)
+        print(
+            "\nUsage: python scripts/validate_recipes.py <file.json> [file2.json ...]\n",
+            file=sys.stderr,
+        )
         return 1
 
     root = Path(__file__).resolve().parent.parent
