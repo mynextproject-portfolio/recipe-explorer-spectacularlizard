@@ -1,56 +1,69 @@
-from fastapi import APIRouter, Request, Form, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
 from typing import Any, List, Optional
 
+from fastapi import APIRouter, Depends, Request, Form, HTTPException
+from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.templating import Jinja2Templates
+
+from app.core.abstractions import ExternalRecipeSource, RecipeRepository
+from app.core.dependencies import get_external_recipe_source, get_recipe_storage
 from app.models import RecipeCreate, RecipeUpdate
-from app.services.storage import recipe_storage
-from app.adapters.themealdb import themealdb_adapter
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
 
-def _get_combined_recipes(search: Optional[str] = None) -> List[dict[str, Any]]:
+def _get_combined_recipes(
+    search: Optional[str],
+    storage: RecipeRepository,
+    external: ExternalRecipeSource,
+) -> List[dict[str, Any]]:
     """Get recipes from internal and external sources, with source field."""
     if search:
-        internal = recipe_storage.search_recipes(search)
-        external = themealdb_adapter.search_meals(search)
+        internal = storage.search_recipes(search)
+        external_recipes = external.search_meals(search)
     else:
-        internal = recipe_storage.get_all_recipes()
-        external = []
+        internal = storage.get_all_recipes()
+        external_recipes = []
 
     result = []
     for r in internal:
         data = r.model_dump(mode="json")
         data["source"] = "internal"
         result.append(data)
-    result.extend(external)
+    result.extend(external_recipes)
     return result
 
 
-def _get_recipe_for_detail(recipe_id: str) -> Optional[dict[str, Any]]:
+def _get_recipe_for_detail(
+    recipe_id: str,
+    storage: RecipeRepository,
+    external: ExternalRecipeSource,
+) -> Optional[dict[str, Any]]:
     """Get recipe by ID from internal or external source."""
-    # Try internal first
-    recipe = recipe_storage.get_recipe(recipe_id)
+    recipe = storage.get_recipe(recipe_id)
     if recipe:
         data = recipe.model_dump(mode="json")
         data["source"] = "internal"
         return data
 
-    # Try external
     external_id = (
         recipe_id.replace("external-", "", 1)
         if recipe_id.startswith("external-")
         else recipe_id
     )
-    return themealdb_adapter.get_meal_by_id(external_id)
+    return external.get_meal_by_id(external_id)
 
 
 @router.get("/", response_class=HTMLResponse)
-def home(request: Request, search: Optional[str] = None, message: Optional[str] = None):
+def home(
+    request: Request,
+    search: Optional[str] = None,
+    message: Optional[str] = None,
+    storage: RecipeRepository = Depends(get_recipe_storage),
+    external: ExternalRecipeSource = Depends(get_external_recipe_source),
+):
     """Home page with recipe list and search (combined internal + external)"""
-    recipes = _get_combined_recipes(search)
+    recipes = _get_combined_recipes(search, storage, external)
 
     return templates.TemplateResponse(
         request,
@@ -68,22 +81,31 @@ def new_recipe_form(request: Request):
 
 
 @router.get("/recipes/{recipe_id}", response_class=HTMLResponse)
-def recipe_detail(request: Request, recipe_id: str, message: Optional[str] = None):
+def recipe_detail(
+    request: Request,
+    recipe_id: str,
+    message: Optional[str] = None,
+    storage: RecipeRepository = Depends(get_recipe_storage),
+    external: ExternalRecipeSource = Depends(get_external_recipe_source),
+):
     """Recipe detail page (internal or external)"""
-    recipe = _get_recipe_for_detail(recipe_id)
+    recipe = _get_recipe_for_detail(recipe_id, storage, external)
     if not recipe:
         raise HTTPException(status_code=404, detail="Recipe not found")
 
-    # Pass as dict so template can check source and show/hide Edit/Delete
     return templates.TemplateResponse(
         request, "recipe_detail.html", {"recipe": recipe, "message": message}
     )
 
 
 @router.get("/recipes/{recipe_id}/edit", response_class=HTMLResponse)
-def edit_recipe_form(request: Request, recipe_id: str):
+def edit_recipe_form(
+    request: Request,
+    recipe_id: str,
+    storage: RecipeRepository = Depends(get_recipe_storage),
+):
     """Edit recipe form"""
-    recipe = recipe_storage.get_recipe(recipe_id)
+    recipe = storage.get_recipe(recipe_id)
     if not recipe:
         raise HTTPException(status_code=404, detail="Recipe not found")
 
@@ -101,23 +123,19 @@ def create_recipe_form(
     instructions: str = Form(...),
     tags: str = Form(...),
     cuisine: Optional[str] = Form(default=""),
+    storage: RecipeRepository = Depends(get_recipe_storage),
 ):
     """Handle new recipe form submission"""
     try:
-        # Check title length
         if len(title) > 200:
             raise ValueError("Title too long")
 
-        # Parse ingredients (one per line) and tags (comma-separated)
         ingredient_list = [
             ing.strip() for ing in ingredients.split("\n") if ing.strip()
         ]
         tag_list = [tag.strip() for tag in tags.split(",") if tag.strip()]
-
-        # Parse instructions: one step per line
         step_list = [s.strip() for s in instructions.split("\n") if s.strip()]
 
-        # Validation
         if len(ingredient_list) == 0:
             raise ValueError("At least one ingredient required")
 
@@ -133,7 +151,7 @@ def create_recipe_form(
             cuisine=cuisine.strip() or None,
         )
 
-        new_recipe = recipe_storage.create_recipe(recipe_data)
+        new_recipe = storage.create_recipe(recipe_data)
         return RedirectResponse(
             url=f"/recipes/{new_recipe.id}?message=Recipe created successfully",
             status_code=303,
@@ -154,20 +172,17 @@ def update_recipe_form(
     instructions: str = Form(...),
     tags: str = Form(...),
     cuisine: Optional[str] = Form(default=""),
+    storage: RecipeRepository = Depends(get_recipe_storage),
 ):
     """Handle edit recipe form submission"""
     try:
-        # Check title length
         if len(title) > 200:
             raise ValueError("Title is too long!")
 
-        # Parse ingredients (one per line) and tags (comma-separated)
         ingredient_list = [
             ing.strip() for ing in ingredients.split("\n") if ing.strip()
         ]
         tag_list = [tag.strip() for tag in tags.split(",") if tag.strip()]
-
-        # Parse instructions: one step per line
         step_list = [s.strip() for s in instructions.split("\n") if s.strip()]
 
         if len(ingredient_list) == 0:
@@ -185,7 +200,7 @@ def update_recipe_form(
             cuisine=cuisine.strip() or None,
         )
 
-        updated_recipe = recipe_storage.update_recipe(recipe_id, recipe_data)
+        updated_recipe = storage.update_recipe(recipe_id, recipe_data)
         if not updated_recipe:
             return RedirectResponse(url="/?message=Recipe not found", status_code=303)
 
@@ -201,9 +216,12 @@ def update_recipe_form(
 
 
 @router.post("/recipes/{recipe_id}/delete")
-def delete_recipe_form(recipe_id: str):
+def delete_recipe_form(
+    recipe_id: str,
+    storage: RecipeRepository = Depends(get_recipe_storage),
+):
     """Handle recipe deletion"""
-    success = recipe_storage.delete_recipe(recipe_id)
+    success = storage.delete_recipe(recipe_id)
     if success:
         return RedirectResponse(
             url="/?message=Recipe deleted successfully", status_code=303

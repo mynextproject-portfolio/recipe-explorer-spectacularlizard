@@ -269,10 +269,10 @@ def test_import_recipes_422_schema_validation(client, clean_storage):
 
 
 def test_search_returns_combined_internal_and_external(
-    client, clean_storage, sample_recipe_data, mock_themealdb
+    client, clean_storage, sample_recipe_data, mock_external
 ):
     """Search returns results from both internal and external sources"""
-    mock_themealdb.search_meals.return_value = [
+    mock_external.search_meals.return_value = [
         {
             "id": "external-52772",
             "title": "External Chicken Casserole",
@@ -315,9 +315,9 @@ def test_get_recipe_internal_not_found(client, clean_storage):
     assert response.status_code == 404
 
 
-def test_get_recipe_external(client, mock_themealdb):
+def test_get_recipe_external(client, mock_external):
     """GET /api/recipes/external/{id} returns external recipe with source"""
-    mock_themealdb.get_meal_by_id.return_value = {
+    mock_external.get_meal_by_id.return_value = {
         "id": "external-52772",
         "title": "Teriyaki Chicken",
         "description": "Yummy chicken",
@@ -336,16 +336,16 @@ def test_get_recipe_external(client, mock_themealdb):
     assert data["source"] == "external"
 
 
-def test_get_recipe_external_not_found(client, mock_themealdb):
+def test_get_recipe_external_not_found(client, mock_external):
     """GET /api/recipes/external/{id} returns 404 for missing external recipe"""
-    mock_themealdb.get_meal_by_id.return_value = None
+    mock_external.get_meal_by_id.return_value = None
     response = client.get("/api/recipes/external/999999")
     assert response.status_code == 404
 
 
-def test_get_recipe_by_id_resolves_external(client, mock_themealdb):
+def test_get_recipe_by_id_resolves_external(client, mock_external):
     """GET /api/recipes/{id} resolves external-{id} format"""
-    mock_themealdb.get_meal_by_id.return_value = {
+    mock_external.get_meal_by_id.return_value = {
         "id": "external-52772",
         "title": "Teriyaki Chicken",
         "description": "Yummy",
@@ -383,10 +383,10 @@ def test_recipes_response_includes_metrics(client, clean_storage):
 
 
 def test_search_response_includes_metrics(
-    client, clean_storage, sample_recipe_data, mock_themealdb
+    client, clean_storage, sample_recipe_data, mock_external
 ):
     """GET /api/recipes?search= returns metrics showing both internal and external timing"""
-    mock_themealdb.search_meals.return_value = [
+    mock_external.search_meals.return_value = [
         {"id": "external-1", "title": "External", "source": "external"}
     ]
     client.post("/api/recipes", json=sample_recipe_data)
@@ -401,11 +401,11 @@ def test_search_response_includes_metrics(
 
 
 def test_metrics_endpoint_returns_aggregate(
-    client, clean_storage, sample_recipe_data, mock_themealdb
+    client, clean_storage, sample_recipe_data, mock_external
 ):
     """GET /api/metrics returns aggregate internal/external/cache stats"""
-    mock_themealdb.search_meals.return_value = []
-    mock_themealdb.get_meal_by_id.return_value = None
+    mock_external.search_meals.return_value = []
+    mock_external.get_meal_by_id.return_value = None
     client.post("/api/recipes", json=sample_recipe_data)
     client.get("/api/recipes")
     client.get("/api/recipes", params={"search": "Test"})

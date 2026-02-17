@@ -1,43 +1,62 @@
 """
 Test fixtures for Recipe Explorer tests.
+Uses FastAPI dependency overrides for testable, isolated components.
 """
 
 import os
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
 
+from app.core.dependencies import get_external_recipe_source, get_recipe_storage
 from app.main import app
 from app.services.metrics import aggregate_metrics
-from app.services.storage import recipe_storage
+from app.services.storage import RecipeStorage
 
 # Disable Redis cache during tests (no Redis required)
 os.environ.setdefault("REDIS_URL", "")
 
 
 @pytest.fixture
-def mock_themealdb():
-    """Mock TheMealDB adapter to avoid real API calls. Returns empty by default."""
+def storage():
+    """Fresh RecipeStorage instance for each test."""
+    return RecipeStorage()
+
+
+@pytest.fixture
+def mock_external():
+    """Mock external recipe source (TheMealDB). Returns empty by default."""
     mock = MagicMock()
     mock.search_meals.return_value = []
     mock.get_meal_by_id.return_value = None
-    with patch("app.routes.api.themealdb_adapter", mock):
-        yield mock
+    return mock
 
 
 @pytest.fixture
-def client(mock_themealdb):
-    """Test client for making requests to the API"""
-    return TestClient(app)
+def client(storage, mock_external):
+    """Test client with dependency overrides for storage and external source."""
+    def get_storage():
+        return storage
+
+    def get_external():
+        return mock_external
+
+    app.dependency_overrides[get_recipe_storage] = get_storage
+    app.dependency_overrides[get_external_recipe_source] = get_external
+
+    try:
+        yield TestClient(app)
+    finally:
+        app.dependency_overrides.clear()
 
 
 @pytest.fixture
-def clean_storage():
-    """Reset storage before and after each test"""
-    recipe_storage.recipes.clear()
+def clean_storage(storage):
+    """Reset storage before and after each test."""
+    storage.recipes.clear()
     yield
-    recipe_storage.recipes.clear()
+    storage.recipes.clear()
 
 
 @pytest.fixture(autouse=True)
